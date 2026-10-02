@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="same-origin">
+<title>配置チェック | MATERIALS LEARNING LAB</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI","Yu Gothic UI",sans-serif;color:#183334;background:#f3f6f3;line-height:1.8}
+*{box-sizing:border-box}body{margin:0}main{max-width:980px;margin:auto;padding:42px 22px}
+a{color:#1d655f}header{border-bottom:2px solid #1d655f;margin-bottom:26px;padding-bottom:20px}
+.eyebrow{font-size:12px;letter-spacing:.16em;color:#386760}h1{font-size:30px;line-height:1.4}h2{font-size:20px}
+p{overflow-wrap:anywhere}.panel{border:1px solid #d4dfdb;background:white;border-radius:16px;padding:24px;margin:20px 0}
+button,.button{font:inherit;border:1px solid #b0c5be;background:#1e5550;color:white;padding:11px 20px;border-radius:8px;cursor:pointer;text-decoration:none;display:inline-block}
+button:disabled{opacity:.5;cursor:wait}.quiet{background:white;color:#23423f}.note{background:#fff5df;border-left:4px solid #b57d22;padding:16px}
+pre{background:#eff4f1;padding:16px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px}
+progress{width:100%;height:16px;accent-color:#27665f}table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;border-bottom:1px solid #dbe5df;padding:9px;overflow-wrap:anywhere}td:last-child{min-width:110px}
+.pass{color:#206b45}.fail{color:#a32c36}.muted{color:#647c78;font-size:14px}.wrap{overflow:auto}
+:focus-visible{outline:3px solid #b57522;outline-offset:4px}
+@media(prefers-color-scheme:dark){:root{color:#e3eee9;background:#142b2a}.panel{background:#193432;border-color:#36534c}a{color:#9ad5c1}.note{background:#3c3320}.quiet{background:#193432;color:#d2eee3}pre{background:#122b27}.pass{color:#88d8ad}.fail{color:#ffb0ad}.muted{color:#b1c9c1}}
+</style>
+</head>
+<body><main>
+<header><div class="eyebrow">MATERIALS LEARNING LAB / DEPLOYMENT CHECK</div><h1>配置チェック</h1><p>教材データと画像の配置を確認します。学習記録の変更や削除は行いません。</p><a href="./">学習アプリへ戻る</a></header>
+<div class="note">この画面はGitHub PagesのサイトURLから開いてください。GitHubのファイル表示画面と、HTMLのダブルクリック起動では検査できません。</div>
+<section class="panel"><h2>アップロードしたファイルを確認</h2><p>教材データは実際に読み込みます。通常は画像のHTTPヘッダーだけを確認します。内容照合を選択した場合は全104画像を読み込み、SHA-256でスキャン版との一致を確認します。検査はこのサイトのファイルだけを対象にします。</p>
+<p><label><input type="checkbox" id="verify-images"> 画像の内容まで照合する（104枚・約101 MBの通信）</label></p>
+<button id="run" type="button">配置チェックを開始</button>
+<p id="status" role="status">未実行</p><progress id="progress" max="1" value="0" aria-label="検査の進捗"></progress>
+<pre id="summary" hidden></pre></section>
+<section id="results" class="panel" hidden><h2>検査結果</h2><p class="muted">エラーのあるファイルは、対応するアップロード用フォルダーから追加してください。保存機能や操作全体の動作を保証する検査ではありません。</p>
+<div class="wrap"><table><thead><tr><th>対象</th><th>結果</th></tr></thead><tbody id="rows"></tbody></table></div></section>
+<section class="panel"><h2>エラーが出たとき</h2>
+<p><strong>data/ または app/ がない：</strong>01_UPLOAD_APPの中身をリポジトリ直下へアップロードしてください。</p>
+<p><strong>pages/ がない：</strong>01_UPLOAD_APP内のpagesフォルダーをリポジトリ直下へアップロードしてください。</p>
+<p><strong>figures/ または originals/ がない：</strong>02_UPLOAD_IMAGES内の2つのフォルダーをリポジトリ直下へアップロードしてください。</p>
+<p><strong>すべてのファイルが見つからない：</strong>Settings → Pagesの設定がmain / (root)であることを確認してください。01_UPLOAD_APPを親フォルダーごと置かず、中身を配置してください。</p>
+<p><strong>配置は正常なのに古い表示が残る：</strong>サイトを再読み込みしてください。本版はオンライン時にアプリと教材テキストの更新を確認します。学習記録を消す操作は不要です。</p>
+</section>
+<p class="muted">スキャン画像版 2026-10-02.scan.1 です。教材には一部未転記の微小文字があります。転記範囲は各ページの注意表示で確認してください。</p>
+</main><script>
+'use strict';
+const $=id=>document.getElementById(id);
+const base=new URL('./',location.href);
+const stamp=String(Date.now());
+function safeURL(path){
+ if(typeof path!=='string'||path.includes('\\'))throw Error('不正な参照パスです。');
+ const u=new URL(path,base);
+ if(u.origin!==base.origin||!u.href.startsWith(base.href)||u.pathname===base.pathname)throw Error('サイト外の参照パスは検査できません。');
+ u.searchParams.set('verify',stamp);
+ return u.href;
+}
+async function get(path,method='GET'){
+ const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),12000);
+ try{return await fetch(safeURL(path),{method,cache:'no-store',credentials:'same-origin',signal:controller.signal});}
+ finally{clearTimeout(timer);}
+}
+function row(name,ok,message){
+ const tr=document.createElement('tr'),a=document.createElement('td'),b=document.createElement('td');
+ a.textContent=name;b.textContent=(ok?'OK · ':'NG · ')+message;b.className=ok?'pass':'fail';
+ tr.append(a,b);$('rows').append(tr);
+}
+function expectedType(path,type){
+ if(/\.(jpg|jpeg|png|webp|svg)$/i.test(path))return type.startsWith('image/');
+ if(path.endsWith('.js'))return /javascript|ecmascript/.test(type);
+ if(path.endsWith('.json'))return /json/.test(type);
+ if(path.endsWith('.css'))return /css/.test(type);
+ if(path.endsWith('.html'))return /html/.test(type);
+ return true;
+}
+$('run').addEventListener('click',async()=>{
+ $('run').disabled=true;$('rows').replaceChildren();$('results').hidden=false;$('summary').hidden=true;
+ let ok=0,ng=0;
+ const verifyImages=$('verify-images').checked;
+ try{
+  if(!['http:','https:'].includes(location.protocol))throw Error('GitHub PagesのサイトURLから開いてください。');
+  $('status').textContent='教材データを確認しています。';
+  const mr=await get('deployment.json');if(!mr.ok)throw Error('deployment.jsonがありません。01_UPLOAD_APPの中身を確認してください。');
+  const m=await mr.json();if(!Array.isArray(m.files)||m.files.length>1000)throw Error('配置情報の形式が不正です。');
+  const cr=await get('data/catalog.json');if(!cr.ok)throw Error('教材データがありません。dataフォルダーを確認してください。');
+  const c=await cr.json();
+  for(const [key,expected] of Object.entries(m.counts)){
+   const actual=key==='originals'?new Set((c.pages||[]).map(p=>p.original)).size:Array.isArray(c[key])?c[key].length:-1;
+   const valid=actual===expected;row('教材件数 / '+key,valid,actual+' / '+expected);valid?ok++:ng++;
+  }
+  const versionOK=c.version===m.catalogVersion;row('教材バージョン',versionOK,String(c.version));versionOK?ok++:ng++;
+  const p50=(c.pages||[]).find(p=>p.number===50);const pageOK=!!p50&&p50.title==='おわりに・参考文献';
+  row('p50',pageOK,p50?.title||'見つかりません');pageOK?ok++:ng++;
+  const excludedOK=!(c.pages||[]).some(p=>p.number===51||p.number===282);
+  row('p51 / p282',excludedOK,excludedOK?'教材対象から除外済み':'対象外ページが残っています');excludedOK?ok++:ng++;
+  const targets=m.files.filter(f=>f.path!=='.nojekyll'&&!f.path.endsWith('.md'));
+  $('progress').max=targets.length;$('progress').value=0;
+  let next=0,done=0;
+  async function runOne(){
+   while(next<targets.length){
+    const f=targets[next++];let valid=false,msg='';
+    try{
+     const hashImage=verifyImages&&/^(pages|figures|originals)\/.+\.jpg$/.test(f.path);
+     const r=await get(f.path,hashImage?'GET':'HEAD');const type=r.headers.get('content-type')||'';
+     valid=r.ok&&expectedType(f.path,type);msg=valid?'配置済み':r.ok?'形式を確認してください ('+type+')':'HTTP '+r.status;
+     if(valid&&hashImage){
+      if(!globalThis.crypto?.subtle)throw Error('SHA-256の照合にはHTTPS接続が必要です。');
+      const bytes=await r.arrayBuffer();const digest=await crypto.subtle.digest('SHA-256',bytes);
+      const hash=Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('');
+      valid=hash===f.sha256;msg=valid?'スキャン版と一致（SHA-256）':'内容が不一致です。スキャン版を上書きしてください。';
+     }
+    }
+    catch(e){valid=false;msg=e.name==='AbortError'?'通信が時間切れになりました':e.message;}
+    valid?ok++:ng++;row(f.path,valid,msg);$('progress').value=++done;$('status').textContent=done+' / '+targets.length+' ファイルを確認しました。';
+   }
+  }
+  await Promise.all(Array.from({length:4},runOne));
+  $('summary').textContent='版: '+m.edition+'\n教材: '+m.catalogVersion+'\n正常: '+ok+'項目 / 要確認: '+ng+'項目\nサイト: '+base.href+'\n確認日時: '+new Date().toISOString();
+  $('summary').hidden=false;
+  $('status').textContent=ng?'要確認の項目があります。下の表を確認してください。':'必要なファイルを確認できました。学習アプリの操作も確認してください。';
+ }catch(e){$('status').textContent=e.message;row('検査の開始',false,e.message);}
+ finally{$('run').disabled=false;}
+});
+</script></body></html>
