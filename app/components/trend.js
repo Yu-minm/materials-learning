@@ -1,0 +1,4 @@
+import { e } from '../lib/dom.js';
+export function accuracyTrend(attempts, label = '累計正答率の推移') { const rows = [...attempts].sort((a, b) => a.at - b.at); if (!rows.length)
+    return '<p class="small muted">解答後に正答率の推移が表示されます。</p>'; let correct = 0; const points = rows.map((r, i) => { if (r.correct)
+    correct++; return { x: 10 + (rows.length === 1 ? 0 : i / (rows.length - 1) * 280), y: 90 - correct / (i + 1) * 80, rate: Math.round(correct / (i + 1) * 100) }; }); const last = points.at(-1); return `<div class="trend-chart"><svg viewBox="0 0 310 110" role="img" aria-label="${e(label)}。現在${last.rate}パーセント、${rows.length}回の解答"><path class="chart-grid" d="M10 10H290M10 50H290M10 90H290"/><polyline class="chart-line" points="${points.map(p => `${p.x},${p.y}`).join(' ')}"/><circle class="chart-dot" cx="${last.x}" cy="${last.y}" r="3"/><text x="10" y="105">最初</text><text x="250" y="105">${rows.length}回目</text></svg><span>${last.rate}%</span></div>`; }
